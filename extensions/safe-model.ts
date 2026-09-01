@@ -154,32 +154,35 @@ export default function (pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       // 先重载 models.json，确保拿到最新的 provider/模型列表
       await ctx.modelRegistry.refresh();
-      const candidates: ModelCandidate[] = ctx.modelRegistry.getAvailable()
-        .map((model) => {
-          const key = modelKey(model);
-          return {
-            key,
-            label: key,
-            searchText: `${key} ${model.name ?? ""}`.toLowerCase(),
-            model,
-          };
-        })
-        .sort((left, right) => left.label.localeCompare(right.label));
+      const availableModels = ctx.modelRegistry.getAvailable();
+      // 与 Pi 内建 model selector 保持一致：有 scope 时只显示 scoped models；空 scope 表示全部可用。
+      const scopedModelKeys = new Set(ctx.scopedModels.map(({ model }) => modelKey(model)));
+      const toCandidate = (model: ModelCandidate["model"]): ModelCandidate => {
+        const key = modelKey(model);
+        return {
+          key,
+          label: key,
+          searchText: `${key} ${model.name ?? ""}`.toLowerCase(),
+          model,
+        };
+      };
+      const allCandidates = availableModels.map(toCandidate);
+      const candidates = (ctx.scopedModels.length > 0
+        ? allCandidates.filter((candidate) => scopedModelKeys.has(candidate.key))
+        : allCandidates
+      ).sort((left, right) => left.label.localeCompare(right.label));
 
-      if (candidates.length === 0) {
+      const currentKey = ctx.model ? modelKey(ctx.model) : undefined;
+      const trimmed = args.trim();
+      if (candidates.length === 0 && trimmed !== ".") {
         ctx.ui.notify("没有已配置凭据的模型", "warning");
         return;
       }
 
-      const currentKey = ctx.model ? modelKey(ctx.model) : undefined;
-
       let selected: ModelCandidate | undefined;
-      const trimmed = args.trim();
       if (trimmed) {
-        selected = candidates.find((c) => {
-          if (trimmed === ".") return c.key === currentKey;
-          return c.key === trimmed;
-        });
+        selected = (trimmed === "." ? allCandidates : candidates)
+          .find((candidate) => candidate.key === (trimmed === "." ? currentKey : trimmed));
         if (!selected) {
           ctx.ui.notify(`未找到模型 "${trimmed}"；使用 /safe-model 从列表选择`, "warning");
           return;

@@ -24,12 +24,12 @@ pi install git:github.com/limars874/safe-model@<commit-hash>
 
 ## 行为
 
-1. 每次执行前调用 `modelRegistry.refresh()` 重载 `models.json`，始终基于最新配置展示已配置凭据的模型列表。
+1. 每次执行前调用 `modelRegistry.refresh()` 重载 `models.json`；有 `scopedModels` 时只展示其中仍可用的模型，没有 scope 时展示全部已配置凭据的模型。
 2. 向所选模型发送一条最小真实请求（无工具、无文件上下文，最多 64 个输出 token），要求返回确认标记。
 3. 仅在模型以正常状态返回确认标记后调用 `pi.setModel` 切换。
 4. 探测失败（凭据错误、网络超时、HTTP 4xx/5xx、模型返回异常）时保留当前模型，并显示结构化诊断面板。
 
-探测不写入当前 session tree。
+探测不写入当前 session tree。`/safe-model .` 是对当前模型的显式检查，即使当前模型不在 scope 内也可以执行。
 
 ## 失败诊断
 
